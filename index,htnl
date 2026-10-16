@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>医学症状分析器</title>
+<style>
+:root {
+  --blue:#2563eb;
+  --blue-light:#eff6ff;
+  --bg:#f4f7fb;
+  --text:#172033;
+  --muted:#64748b;
+  --border:#e2e8f0;
+  --red:#dc2626;
+  --green:#15803d;
+}
+* { box-sizing:border-box; }
+body {
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  line-height:1.65;
+}
+header {
+  background:linear-gradient(135deg,#1d4ed8,#38bdf8);
+  color:white;
+  padding:32px 18px;
+}
+.header-inner,.container {
+  max-width:1100px;
+  margin:auto;
+}
+header h1 { margin:0 0 8px; font-size:29px; }
+header p { margin:0; opacity:.95; }
+.container { padding:22px 15px 45px; }
+.card {
+  background:white;
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:22px;
+  margin-bottom:18px;
+  box-shadow:0 4px 15px rgba(15,23,42,.035);
+}
+h2 { font-size:20px; margin:0 0 16px; }
+h3 { font-size:17px; margin:0 0 10px; }
+.muted { color:var(--muted); font-size:13px; }
+.grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:15px;
+}
+label.field { display:block; font-weight:600; margin-bottom:6px; }
+input,select,button {
+  font:inherit;
+}
+input[type="number"],input[type="text"],select {
+  width:100%;
+  padding:11px 12px;
+  border:1px solid #cbd5e1;
+  border-radius:9px;
+  background:white;
+}
+input:focus,select:focus {
+  outline:2px solid #93c5fd;
+  border-color:var(--blue);
+}
+.filter-row {
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin:12px 0;
+}
+.chip {
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  background:#f8fafc;
+  border:1px solid var(--border);
+  border-radius:9px;
+  padding:8px 11px;
+  font-size:14px;
+  cursor:pointer;
+}
+.chip:has(input:checked) {
+  background:var(--blue-light);
+  border-color:#93c5fd;
+  color:#1d4ed8;
+}
+.chip input { accent-color:var(--blue); }
+.buttons {
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  margin-top:15px;
+}
+button {
+  border:0;
+  border-radius:9px;
+  padding:10px 16px;
+  cursor:pointer;
+  font-weight:650;
+}
+.primary { background:var(--blue); color:white; }
+.secondary { background:#e2e8f0; color:#1e293b; }
+button:hover { filter:brightness(.96); }
+.alert {
+  padding:15px;
+  border-radius:12px;
+  margin-bottom:16px;
+}
+.alert-red {
+  background:#fef2f2;
+  border:1px solid #fecaca;
+  color:#991b1b;
+}
+.alert-blue {
+  background:#eff6ff;
+  border:1px solid #bfdbfe;
+  color:#1e40af;
+}
+.hidden { display:none!important; }
+.summary {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+  gap:10px;
+  margin:15px 0;
+}
+.summary-item {
+  background:#f8fafc;
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:12px;
+}
+.summary-item strong { display:block; font-size:18px; }
+.results {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(270px,1fr));
+  gap:14px;
+}
+.disease {
+  border:1px solid var(--border);
+  border-radius:13px;
+  padding:16px;
+  background:white;
+}
+.disease h3 { color:#1d4ed8; }
+.tag {
+  display:inline-block;
+  border-radius:6px;
+  padding:3px 8px;
+  background:#eff6ff;
+  color:#1d4ed8;
+  font-size:12px;
+  margin:2px 3px 2px 0;
+}
+.matched { color:var(--green); font-size:13px; }
+.footer { color:var(--muted); font-size:12px; text-align:center; }
+a { color:#1d4ed8; }
+</style>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <h1>＋ 医学症状分析器</h1>
+    <p>年龄与性别筛选 · 症状匹配 · 疾病知识参考</p>
+  </div>
+</header>
+<main class="container">
+  <div class="alert alert-red">
+    <strong>紧急情况请优先求助</strong>
+    <p style="margin:6px 0 0">
+      如果出现严重呼吸困难、持续或严重胸痛、突然一侧无力、
+      突然说话困难、意识异常或严重过敏反应，请立即寻求急救。
+      在加拿大拨打 911。不要等待网页分析结果。
+    </p>
+  </div>
+  <div class="alert alert-blue">
+    <strong>重要说明</strong>
+    本网页仅供健康教育和症状整理使用，不是医疗诊断工具。
+    匹配结果不代表患病概率，也不能代替医生检查。
+    年龄和性别不能单独用于确诊或排除疾病。
+  </div>
+  <section class="card">
+    <h2>01 · 基本信息</h2>
+    <div class="grid">
+      <div>
+        <label class="field" for="age">年龄（岁）</label>
+        <input id="age" type="number" min="0" max="120"
+               placeholder="请输入 0–120 的年龄">
+        <div class="muted" id="ageGroup">填写年龄后显示年龄组</div>
+      </div>
+      <div>
+        <label class="field" for="sex">性别</label>
+        <select id="sex">
+          <option value="unspecified">不愿透露</option>
+          <option value="female">女性</option>
+          <option value="male">男性</option>
+          <option value="other">其他</option>
+        </select>
+        <div class="muted">仅用于结果摘要；不会据此自动排除疾病。</div>
+      </div>
+      <div>
+        <label class="field" for="duration">症状持续时间</label>
+        <select id="duration">
+          <option value="unknown">尚不清楚</option>
+          <option value="hours">数小时</option>
+          <option value="days">数天</option>
+          <option value="weeks">数周</option>
+          <option value="months">数月或更久</option>
+        </select>
+      </div>
+    </div>
+  </section>
+  <section class="card">
+    <h2>02 · 选择症状</h2>
+    <p class="muted">可以多选。也可以搜索症状名称。</p>
+    <input id="symptomSearch" type="text" placeholder="搜索症状，例如：咳嗽、发热、头痛">
+    <div class="filter-row" id="systemFilters"></div>
+    <div id="symptomList" class="filter-row"></div>
+    <div class="buttons">
+      <button class="primary" id="analyzeBtn">分析匹配结果</button>
+      <button class="secondary" id="selectNoneBtn">清空症状</button>
+    </div>
+  </section>
+  <section class="card">
+    <h2>03 · 分析设置</h2>
+    <div class="grid">
+      <div>
+        <label class="field" for="matchMode">匹配方式</label>
+        <select id="matchMode">
+          <option value="any">显示至少匹配一个症状的疾病</option>
+          <option value="two">优先显示至少匹配两个症状的疾病</option>
+          <option value="all">只显示所选症状全部匹配的疾病</option>
+        </select>
+      </div>
+      <div>
+        <label class="field" for="sortMode">排序方式</label>
+        <select id="sortMode">
+          <option value="matched">匹配症状数量：从多到少</option>
+          <option value="name">疾病名称：A–Z</option>
+          <option value="system">按系统分类</option>
+        </select>
+      </div>
+    </div>
+    <div class="buttons">
+      <button class="primary" id="exportBtn">导出 JSON 报告</button>
+    </div>
+  </section>
+  <section class="card hidden" id="resultSection">
+    <h2>04 · 分析结果</h2>
+    <div id="ageNotice"></div>
+    <div id="profileSummary" class="summary"></div>
+    <p id="resultDescription" class="muted"></p>
+    <div id="resultList" class="results"></div>
+    <p class="muted">
+      结果仅代表症状文字匹配，不是概率或诊断。
+      即使没有匹配结果，也不能据此排除疾病。
+    </p>
+  </section>
+  <section class="card">
+    <h2>05 · 参考资料</h2>
+    <p><a href="https://medlineplus.gov/" target="_blank" rel="noopener">MedlinePlus：健康与疾病知识</a></p>
+    <p><a href="https://www.canada.ca/en/public-health.html" target="_blank" rel="noopener">加拿大公共卫生署</a></p>
+    <p><a href="https://www.healthlinkbc.ca/" target="_blank" rel="noopener">HealthLink BC：健康信息</a></p>
+  </section>
+  <p class="footer">
+    本工具不保存或上传填写的信息。请勿将它用于自我确诊、用药决定或延误就医。
+  </p>
+</main>
+<script>
+"use strict";
+/* * 这是一个可扩展的教育性症状匹配数据库。 * 疾病条目中的症状只是示例性关联，不是完整医学标准。 * 不依据年龄、性别自动诊断或排除疾病。 */
+const symptoms = [
+  {id:"fever",name:"发热",system:"全身"},
+  {id:"chills",name:"寒战",system:"全身"},
+  {id:"fatigue",name:"疲劳",system:"全身"},
+  {id:"weakness",name:"乏力",system:"全身"},
+  {id:"weightloss",name:"非预期体重下降",system:"全身"},
+  {id:"night_sweats",name:"夜间出汗",system:"全身"},
+  {id:"cough",name:"咳嗽",system:"呼吸系统"},
+  {id:"dry_cough",name:"干咳",system:"呼吸系统"},
+  {id:"sputum",name:"咳痰",system:"呼吸系统"},
+  {id:"sore_throat",name:"咽喉痛",system:"呼吸系统"},
+  {id:"runny_nose",name:"流鼻涕",system:"呼吸系统"},
+  {id:"sneezing",name:"打喷嚏",system:"呼吸系统"},
+  {id:"short_breath",name:"呼吸困难",system:"呼吸系统"},
+  {id:"wheeze",name:"喘鸣",system:"呼吸系统"},
+  {id:"chest_pain",name:"胸痛",system:"心血管系统"},
+  {id:"palpitation",name:"心悸",system:"心血管系统"},
+  {id:"dizziness",name:"头晕",system:"神经系统"},
+  {id:"headache",name:"头痛",system:"神经系统"},
+  {id:"migraine_sign",name:"畏光或伴恶心的头痛",system:"神经系统"},
+  {id:"numbness",name:"麻木或感觉异常",system:"神经系统"},
+  {id:"confusion",name:"意识混乱",system:"神经系统"},
+  {id:"weak_one_side",name:"突然单侧无力",system:"神经系统"},
+  {id:"speech",name:"说话困难",system:"神经系统"},
+  {id:"nausea",name:"恶心",system:"消化系统"},
+  {id:"vomiting",name:"呕吐",system:"消化系统"},
+  {id:"diarrhea",name:"腹泻",system:"消化系统"},
+  {id:"constipation",name:"便秘",system:"消化系统"},
+  {id:"abdominal_pain",name:"腹痛",system:"消化系统"},
+  {id:"heartburn",name:"烧心或反酸",system:"消化系统"},
+  {id:"bloating",name:"腹胀",system:"消化系统"},
+  {id:"jaundice",name:"皮肤或眼白发黄",system:"消化系统"},
+  {id:"urinary_pain",name:"排尿疼痛",system:"泌尿系统"},
+  {id:"frequent_urination",name:"尿频",system:"泌尿系统"},
+  {id:"blood_urine",name:"尿中带血",system:"泌尿系统"},
+  {id:"back_pain",name:"腰背痛",system:"肌肉骨骼"},
+  {id:"joint_pain",name:"关节痛",system:"肌肉骨骼"},
+  {id:"joint_swelling",name:"关节肿胀",system:"肌肉骨骼"},
+  {id:"rash",name:"皮疹",system:"皮肤"},
+  {id:"itching",name:"瘙痒",system:"皮肤"},
+  {id:"hives",name:"风团或荨麻疹",system:"皮肤"},
+  {id:"swelling_lips",name:"嘴唇或舌头肿胀",system:"皮肤"},
+  {id:"red_eye",name:"眼睛发红",system:"眼耳鼻喉"},
+  {id:"ear_pain",name:"耳痛",system:"眼耳鼻喉"},
+  {id:"insomnia",name:"失眠",system:"心理与睡眠"},
+  {id:"anxiety",name:"焦虑或持续担忧",system:"心理与睡眠"},
+  {id:"low_mood",name:"持续情绪低落",system:"心理与睡眠"},
+  {id:"thirst",name:"异常口渴",system:"内分泌代谢"},
+  {id:"frequent_urine",name:"排尿次数增加",system:"内分泌代谢"},
+  {id:"heat_intolerance",name:"怕热",system:"内分泌代谢"},
+  {id:"cold_intolerance",name:"怕冷",system:"内分泌代谢"},
+  {id:"heavy_period",name:"月经量明显增多",system:"月经相关"},
+  {id:"missed_period",name:"月经推迟或停止",system:"月经相关"}
+];
+const diseases = [
+  {name:"普通感冒",system:"呼吸系统",symptoms:["cough","runny_nose","sneezing","sore_throat","fatigue"]},
+  {name:"流感",system:"呼吸系统",symptoms:["fever","chills","cough","headache","fatigue","weakness"]},
+  {name:"COVID-19",system:"呼吸系统",symptoms:["fever","cough","sore_throat","fatigue","headache","short_breath"]},
+  {name:"过敏性鼻炎",system:"呼吸系统",symptoms:["runny_nose","sneezing","itching"]},
+  {name:"鼻窦炎",system:"呼吸系统",symptoms:["headache","runny_nose","fever","fatigue"]},
+  {name:"哮喘",system:"呼吸系统",symptoms:["cough","dry_cough","short_breath","wheeze","chest_pain"]},
+  {name:"支气管炎",system:"呼吸系统",symptoms:["cough","sputum","fatigue","fever","short_breath"]},
+  {name:"肺炎",system:"呼吸系统",symptoms:["fever","cough","sputum","short_breath","chest_pain","fatigue"]},
+  {name:"胃食管反流",system:"消化系统",symptoms:["heartburn","nausea","cough","abdominal_pain"]},
+  {name:"胃肠炎",system:"消化系统",symptoms:["nausea","vomiting","diarrhea","abdominal_pain","fever"]},
+  {name:"胃炎",system:"消化系统",symptoms:["abdominal_pain","nausea","vomiting","bloating"]},
+  {name:"肠易激综合征",system:"消化系统",symptoms:["abdominal_pain","diarrhea","constipation","bloating"]},
+  {name:"阑尾炎",system:"消化系统",symptoms:["abdominal_pain","nausea","vomiting","fever"]},
+  {name:"胆结石相关问题",system:"消化系统",symptoms:["abdominal_pain","nausea","vomiting"]},
+  {name:"肝脏疾病相关症状",system:"消化系统",symptoms:["fatigue","abdominal_pain","jaundice","nausea"]},
+  {name:"偏头痛",system:"神经系统",symptoms:["headache","migraine_sign","nausea","dizziness"]},
+  {name:"紧张型头痛",system:"神经系统",symptoms:["headache","fatigue"]},
+  {name:"眩晕相关疾病",system:"神经系统",symptoms:["dizziness","nausea"]},
+  {name:"中风警示症状",system:"神经系统",symptoms:["weak_one_side","speech","confusion","dizziness","headache"]},
+  {name:"贫血相关症状",system:"全身",symptoms:["fatigue","weakness","dizziness","short_breath","palpitation"]},
+  {name:"甲状腺功能减退",system:"内分泌代谢",symptoms:["fatigue","cold_intolerance","constipation","weightloss"]},
+  {name:"甲状腺功能亢进",system:"内分泌代谢",symptoms:["palpitation","heat_intolerance","anxiety","fatigue","weightloss"]},
+  {name:"糖尿病相关症状",system:"内分泌代谢",symptoms:["thirst","frequent_urine","fatigue","weightloss"]},
+  {name:"尿路感染",system:"泌尿系统",symptoms:["urinary_pain","frequent_urination","fever","abdominal_pain"]},
+  {name:"肾结石",system:"泌尿系统",symptoms:["back_pain","abdominal_pain","nausea","blood_urine"]},
+  {name:"湿疹",system:"皮肤",symptoms:["rash","itching"]},
+  {name:"荨麻疹",system:"皮肤",symptoms:["hives","itching","rash"]},
+  {name:"严重过敏反应警示",system:"皮肤与呼吸系统",symptoms:["hives","swelling_lips","short_breath","dizziness"]},
+  {name:"骨关节炎",system:"肌肉骨骼",symptoms:["joint_pain","joint_swelling","back_pain"]},
+  {name:"炎症性关节病相关症状",system:"肌肉骨骼",symptoms:["joint_pain","joint_swelling","fatigue"]},
+  {name:"腰背痛",system:"肌肉骨骼",symptoms:["back_pain"]},
+  {name:"失眠相关问题",system:"心理与睡眠",symptoms:["insomnia","fatigue","anxiety"]},
+  {name:"焦虑相关症状",system:"心理与睡眠",symptoms:["anxiety","insomnia","palpitation","dizziness"]},
+  {name:"抑郁相关症状",system:"心理与睡眠",symptoms:["low_mood","fatigue","insomnia"]},
+  {name:"心律失常相关症状",system:"心血管系统",symptoms:["palpitation","dizziness","short_breath","chest_pain"]},
+  {name:"心力衰竭相关症状",system:"心血管系统",symptoms:["short_breath","fatigue","weakness"]},
+  {name:"睡眠呼吸暂停相关症状",system:"呼吸与睡眠",symptoms:["fatigue","insomnia","headache"]},
+  {name:"结膜炎",system:"眼耳鼻喉",symptoms:["red_eye","itching"]},
+  {name:"耳部感染相关症状",system:"眼耳鼻喉",symptoms:["ear_pain","fever"]},
+  {name:"痛风相关症状",system:"肌肉骨骼",symptoms:["joint_pain","joint_swelling"]}
+];
+const symptomList = document.getElementById("symptomList");
+const systemFilters = document.getElementById("systemFilters");
+const searchInput = document.getElementById("symptomSearch");
+let activeSystem = "全部";
+let lastResults = [];
+let lastSelected = [];
+const systems = ["全部", ...new Set(symptoms.map(s => s.system))];
+systems.forEach(system => {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "secondary";
+  button.textContent = system;
+  button.addEventListener("click", () => {
+    activeSystem = system;
+    renderSystemFilters();
+    renderSymptoms();
+  });
+  button.dataset.system = system;
+  systemFilters.appendChild(button);
+});
+function renderSystemFilters() {
+  [...systemFilters.children].forEach(button => {
+    button.className = button.dataset.system === activeSystem
+      ? "primary" : "secondary";
+  });
+}
+function renderSymptoms() {
+  const query = searchInput.value.trim().toLowerCase();
+  symptomList.innerHTML = "";
+  symptoms
+    .filter(s => activeSystem === "全部" || s.system === activeSystem)
+    .filter(s => s.name.toLowerCase().includes(query))
+    .forEach(s => {
+      const label = document.createElement("label");
+      label.className = "chip";
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.value = s.id;
+      checkbox.checked = document.querySelector(
+        `input[name="symptom"][value="${s.id}"]`
+      )?.checked || false;
+      checkbox.name = "symptom";
+      label.append(checkbox, document.createTextNode(s.name));
+      symptomList.appendChild(label);
+    });
+}
+function selectedSymptoms() {
+  return [...document.querySelectorAll('input[name="symptom"]:checked')]
+    .map(input => input.value);
+}
+function getAgeGroup(age) {
+  if (age === null) return "未填写";
+  if (age < 1) return "婴儿（不足1岁）";
+  if (age < 5) return "幼儿（1–4岁）";
+  if (age < 13) return "儿童（5–12岁）";
+  if (age < 18) return "青少年（13–17岁）";
+  if (age < 65) return "成人（18–64岁）";
+  return "老年人（65岁及以上）";
+}
+function getAge() {
+  const raw = document.getElementById("age").value.trim();
+  if (raw === "") return null;
+  const age = Number(raw);
+  if (!Number.isInteger(age) || age < 0 || age > 120) {
+    throw new Error("年龄必须是 0–120 之间的整数。");
+  }
+  return age;
+}
+function getSexLabel(value) {
+  return {
+    female:"女性",
+    male:"男性",
+    other:"其他",
+    unspecified:"不愿透露"
+  }[value] || "不愿透露";
+}
+function getDurationLabel(value) {
+  return {
+    unknown:"尚不清楚",
+    hours:"数小时",
+    days:"数天",
+    weeks:"数周",
+    months:"数月或更久"
+  }[value] || "尚不清楚";
+}
+function renderAgeNotice(age) {
+  const box = document.getElementById("ageNotice");
+  box.innerHTML = "";
+  if (age === null) {
+    box.innerHTML =
+      '<div class="alert alert-blue">尚未填写年龄。填写年龄可帮助整理基本信息，但不会改变疾病诊断结论。</div>';
+    return;
+  }
+  let message = "";
+  if (age < 1) {
+    message = "婴儿出现发热、喂养困难、精神状态改变或呼吸异常时，应及时寻求专业医疗评估。";
+  } else if (age < 5) {
+    message = "幼儿病情可能变化较快。如果出现呼吸异常、明显嗜睡、脱水或持续恶化，应及时就医。";
+  } else if (age < 18) {
+    message = "儿童和青少年的用药与评估可能与成人不同。请勿直接套用成人药物剂量。";
+  } else if (age >= 65) {
+    message = "老年人的症状可能不典型。新出现的意识变化、明显虚弱或呼吸异常需要及时评估。";
+  } else {
+    message = "年龄只是临床评估的一个因素。症状严重程度、持续时间、病史和体格检查同样重要。";
+  }
+  box.innerHTML = "";
+  const notice = document.createElement("div");
+  notice.className = "alert alert-blue";
+  notice.textContent = message;
+  box.appendChild(notice);
+}
+function renderSummary(age, sex, duration, selected) {
+  const container = document.getElementById("profileSummary");
+  container.innerHTML = "";
+  const entries = [
+    ["年龄", age === null ? "未填写" : age + " 岁"],
+    ["年龄组", getAgeGroup(age)],
+    ["性别", getSexLabel(sex)],
+    ["症状持续时间", getDurationLabel(duration)],
+    ["已选症状", selected.length + " 项"]
+  ];
+  entries.forEach(([label, value]) => {
+    const item = document.createElement("div");
+    item.className = "summary-item";
+    const strong = document.createElement("strong");
+    strong.textContent = value;
+    const small = document.createElement("span");
+    small.className = "muted";
+    small.textContent = label;
+    item.append(strong, small);
+    container.appendChild(item);
+  });
+}
+function analyze() {
+  let age;
+  try {
+    age = getAge();
+  } catch (error) {
+    alert(error.message);
+    return;
+  }
+  const sex = document.getElementById("sex").value;
+  const duration = document.getElementById("duration").value;
+  const selected = selectedSymptoms();
+  const mode = document.getElementById("matchMode").value;
+  const sortMode = document.getElementById("sortMode").value;
+  if (selected.length === 0) {
+    alert("请至少选择一个症状。");
+    return;
+  }
+  let results = diseases.map(disease => {
+    const matched = disease.symptoms.filter(s => selected.includes(s));
+    return {
+      ...disease,
+      matched,
+      count:matched.length
+    };
+  });
+  results = results.filter(d => {
+    if (mode === "all") return d.count === selected.length;
+    if (mode === "two") return d.count >= 2;
+    return d.count >= 1;
+  });
+  if (sortMode === "name") {
+    results.sort((a,b) => a.name.localeCompare(b.name, "zh-CN"));
+  } else if (sortMode === "system") {
+    results.sort((a,b) =>
+      a.system.localeCompare(b.system, "zh-CN") ||
+      b.count - a.count
+    );
+  } else {
+    results.sort((a,b) => b.count - a.count);
+  }
+  lastResults = results;
+  lastSelected = selected;
+  renderAgeNotice(age);
+  renderSummary(age, sex, duration, selected);
+  const description = document.getElementById("resultDescription");
+  description.textContent =
+    `根据 ${selected.length} 项已选症状，在内置数据库中找到 ${results.length} 个文字匹配条目。此数量不代表患病概率。`;
+  const container = document.getElementById("resultList");
+  container.innerHTML = "";
+  if (results.length === 0) {
+    container.textContent =
+      "没有找到符合当前匹配规则的条目。这不代表你没有疾病，请勿据此排除疾病。";
+  }
+  results.forEach(disease => {
+    const card = document.createElement("article");
+    card.className = "disease";
+    const title = document.createElement("h3");
+    title.textContent = disease.name;
+    const system = document.createElement("span");
+    system.className = "tag";
+    system.textContent = disease.system;
+    const matched = document.createElement("p");
+    matched.className = "matched";
+    matched.textContent =
+      `文字匹配：${disease.count} / ${selected.length} 项已选症状`;
+    const list = document.createElement("p");
+    list.className = "muted";
+    const names = disease.matched.map(id =>
+      symptoms.find(s => s.id === id)?.name || id
+    );
+    list.textContent = "匹配症状：" + names.join("、");
+    const note = document.createElement("p");
+    note.textContent =
+      "仅为症状关联参考。此条目不能确认或排除该疾病，也不构成个体化诊断。";
+    card.append(title, system, matched, list, note);
+    container.appendChild(card);
+  });
+  document.getElementById("resultSection").classList.remove("hidden");
+  document.getElementById("resultSection").scrollIntoView({
+    behavior:"smooth",
+    block:"start"
+  });
+}
+document.getElementById("age").addEventListener("input", () => {
+  const ageText = document.getElementById("age").value.trim();
+  const label = document.getElementById("ageGroup");
+  if (ageText === "") {
+    label.textContent = "填写年龄后显示年龄组";
+    return;
+  }
+  const age = Number(ageText);
+  if (Number.isInteger(age) && age >= 0 && age <= 120) {
+    label.textContent = "年龄组：" + getAgeGroup(age);
+  } else {
+    label.textContent = "请输入 0–120 之间的整数";
+  }
+});
+searchInput.addEventListener("input", renderSymptoms);
+document.getElementById("analyzeBtn").addEventListener("click", analyze);
+document.getElementById("selectNoneBtn").addEventListener("click", () => {
+  document.querySelectorAll('input[name="symptom"]').forEach(input => {
+    input.checked = false;
+  });
+});
+document.getElementById("exportBtn").addEventListener("click", () => {
+  if (lastSelected.length === 0) {
+    alert("请先选择症状并分析，再导出报告。");
+    return;
+  }
+  let age;
+  try {
+    age = getAge();
+  } catch (error) {
+    alert(error.message);
+    return;
+  }
+  const report = {
+    title:"医学症状分析器教育性参考报告",
+    createdAt:new Date().toISOString(),
+    disclaimer:"非诊断结果；症状匹配不代表患病概率，不能替代专业医疗评估。",
+    profile:{
+      age,
+      ageGroup:getAgeGroup(age),
+      sex:getSexLabel(document.getElementById("sex").value),
+      duration:getDurationLabel(document.getElementById("duration").value)
+    },
+    selectedSymptoms:lastSelected.map(id => ({
+      id,
+      name:symptoms.find(s => s.id === id)?.name || id
+    })),
+    matchedEntries:lastResults.map(d => ({
+      name:d.name,
+      system:d.system,
+      matchedCount:d.count,
+      matchedSymptoms:d.matched.map(id =>
+        symptoms.find(s => s.id === id)?.name || id
+      )
+    }))
+  };
+  const blob = new Blob(
+    [JSON.stringify(report, null, 2)],
+    {type:"application/json;charset=utf-8"}
+  );
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "medical-symptom-report.json";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+});
+renderSystemFilters();
+renderSymptoms();
+</script>
+</body>
+</html>
+
